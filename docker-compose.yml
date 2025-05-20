@@ -1,0 +1,67 @@
+services:
+    app:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        image: fitness-app-laravel
+        container_name: fitness-app
+        restart: unless-stopped
+        working_dir: /var/www/html
+        volumes:
+            - './:/var/www/html'
+        networks:
+            - fitness-network
+        depends_on:
+            - mysql
+            - redis
+    nginx:
+        image: 'nginx:alpine'
+        container_name: fitness-nginx
+        restart: unless-stopped
+        ports:
+            - '8000:80'
+        volumes:
+            - './:/var/www/html'
+            - './docker/nginx/conf.d:/etc/nginx/conf.d'
+        networks:
+            - fitness-network
+        depends_on:
+            - app
+    mysql:
+        image: 'mysql:5.7'
+        container_name: fitness-db
+        restart: unless-stopped
+        environment:
+            MYSQL_DATABASE: fitness_app
+            MYSQL_ROOT_PASSWORD: password
+            MYSQL_USER: laravel
+            MYSQL_PASSWORD: password
+            SERVICE_TAGS: dev
+            SERVICE_NAME: mysql
+        ports:
+            - '3306:3306'
+        volumes:
+            - 'fitness-mysql-data:/var/lib/mysql'
+        networks:
+            - fitness-network
+    redis:
+        image: 'redis:alpine'
+        container_name: fitness-redis
+        restart: unless-stopped
+        ports:
+            - '6379:6379'
+        networks:
+            - fitness-network
+    mailpit:
+        image: 'axllent/mailpit:latest'
+        ports:
+            - '${FORWARD_MAILPIT_PORT:-1025}:1025'
+            - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
+        networks:
+            - fitness-network
+networks:
+    fitness-network:
+        driver: bridge
+volumes:
+    fitness-mysql-data:
+        driver: local
