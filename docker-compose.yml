@@ -59,6 +59,18 @@ services:
             - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
         networks:
             - fitness-network
+    phpmyadmin:
+        image: phpmyadmin/phpmyadmin
+        container_name: fitness-phpmyadmin
+        environment:
+            PMA_HOST: mysql
+            PMA_PORT: 3306
+            PMA_USER: root
+            PMA_PASSWORD: password
+        ports:
+            - "8080:80"
+        networks:
+            - fitness-network
 networks:
     fitness-network:
         driver: bridge
