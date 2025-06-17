@@ -33,6 +33,10 @@
         }
     },
     "scripts": {
+        "post-install-cmd": [
+            "@php artisan package:discover --ansi",
+            "if test \"$APP_ENV\" = \"production\" ; then npm run build ; fi"
+        ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"

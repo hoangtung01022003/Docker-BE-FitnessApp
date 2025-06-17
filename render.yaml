@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: fitness-api
+    env: php
+    buildCommand: 'composer install --no-interaction --prefer-dist --optimize-autoloader && php artisan migrate --force'
+    startCommand: 'php artisan serve --host 0.0.0.0 --port $PORT'
+    plan: free
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
+      - key: APP_URL
+        value: https://fitness-api.onrender.com
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_DATABASE
+        fromDatabase:
+          name: fitness_db
+          property: database
+      - key: DB_HOST
+        fromDatabase:
+          name: fitness_db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: fitness_db
+          property: port
+      - key: DB_USERNAME
+        fromDatabase:
+          name: fitness_db
+          property: username
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: fitness_db
+          property: password
+
+databases:
+  - name: fitness_db
+    plan: free
