@@ -16,7 +16,8 @@ RUN apt-get update && apt-get install -y \
     libzip-dev \
     nginx \
     supervisor \
-    default-mysql-client
+    default-mysql-client \
+    netcat-traditional
 
 # Clean cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
