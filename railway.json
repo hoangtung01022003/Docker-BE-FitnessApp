@@ -9,7 +9,15 @@
     "restartPolicyMaxRetries": 5,
     "numReplicas": 1,
     "healthcheckPath": "/api/health",
-    "healthcheckTimeout": 10,
-    "healthcheckInterval": 30
+    "healthcheckTimeout": 10
+  },
+  "plugins": {
+    "mysql": {
+      "version": "8.0",
+      "envVars": {
+        "MYSQL_DATABASE": "fitness_app",
+        "MYSQL_ROOT_PASSWORD": "railwaypassword123"
+      }
+    }
   }
 }

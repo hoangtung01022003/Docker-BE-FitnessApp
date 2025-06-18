@@ -22,3 +22,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/update-profile', [AuthController::class, 'updateProfile']);
 });
+
+// Health check endpoint cho Railway
+Route::get('/health', function() {
+    return response()->json([
+        'status' => 'ok',
+        'message' => 'API is running',
+        'server_time' => now()->toDateTimeString(),
+        'app_env' => config('app.env'),
+        'db_connection' => config('database.default')
+    ]);
+});

@@ -2,9 +2,9 @@
 
 echo "🚂 Khởi động ứng dụng trên Railway..."
 
-# Tạo file .env từ các biến môi trường
+# Tạo file .env từ các biến môi trường - Sửa lỗi whitespace
 cat > .env << EOF
-APP_NAME=${APP_NAME:-"Fitness App"}
+APP_NAME=FitnessApp
 APP_ENV=${APP_ENV:-production}
 APP_KEY=${APP_KEY:-}
 APP_DEBUG=${APP_DEBUG:-false}
