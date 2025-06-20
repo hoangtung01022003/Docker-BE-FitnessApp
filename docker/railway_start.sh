@@ -1,26 +1,78 @@
 #!/bin/bash
 
-echo "🚂 Khởi động ứng dụng trên Railway..."
+echo "🚂 Khởi động ứng dụng trên Railway với Nginx..."
 
-# Tạo file .env từ các biến môi trường - Sửa lỗi whitespace
+# Kiểm tra biến môi trường Railway
+echo "Kiểm tra biến môi trường Railway..."
+env | grep -E "RAILWAY_|MYSQL|DB_|PORT|CORS_" || echo "Không tìm thấy biến môi trường cần thiết"
+
+# Vô hiệu hóa Apache nếu có
+if [ -f "/etc/apache2/sites-available/000-default.conf" ]; then
+  echo "Vô hiệu hóa Apache..."
+  mv /etc/apache2/sites-available/000-default.conf /etc/apache2/sites-available/000-default.conf.bak
+  echo "✅ Apache đã được vô hiệu hóa"
+fi
+
+# Trích xuất các giá trị CORS từ biến môi trường
+CORS_ORIGIN="*"
+CORS_METHODS="GET,POST,PUT,DELETE,OPTIONS"
+CORS_HEADERS="Content-Type,Authorization,X-Requested-With"
+
+if [ ! -z "${CORS_ALLOW_ORIGIN}" ]; then
+  CORS_PARTS=(${CORS_ALLOW_ORIGIN})
+  CORS_ORIGIN=${CORS_PARTS[0]}
+  
+  for part in "${CORS_PARTS[@]}"; do
+    if [[ $part == CORS_ALLOW_METHODS=* ]]; then
+      CORS_METHODS=${part#CORS_ALLOW_METHODS=}
+    elif [[ $part == CORS_ALLOW_HEADERS=* ]]; then
+      CORS_HEADERS=${part#CORS_ALLOW_HEADERS=}
+    fi
+  done
+fi
+
+echo "CORS Origin: $CORS_ORIGIN"
+echo "CORS Methods: $CORS_METHODS"
+echo "CORS Headers: $CORS_HEADERS"
+
+# Kiểm tra xem chúng ta đang ở trong thư mục gốc của Laravel hay không
+if [ -f "artisan" ]; then
+  LARAVEL_ROOT=$(pwd)
+  echo "✅ Đã phát hiện thư mục gốc Laravel tại: $LARAVEL_ROOT"
+else
+  echo "❌ ERROR: Không tìm thấy file 'artisan' trong thư mục hiện tại!"
+  echo "Thư mục hiện tại: $(pwd)"
+  echo "Nội dung thư mục:"
+  ls -la
+  
+  # Tìm kiếm file artisan trong các thư mục con
+  ARTISAN_PATH=$(find . -name "artisan" -type f | head -n 1)
+  if [ ! -z "$ARTISAN_PATH" ]; then
+    LARAVEL_ROOT=$(dirname "$ARTISAN_PATH")
+    echo "Tìm thấy file artisan tại: $ARTISAN_PATH"
+    echo "Chuyển đến thư mục: $LARAVEL_ROOT"
+    cd "$LARAVEL_ROOT"
+  fi
+fi
+
+# Tạo file .env từ các biến môi trường với các giá trị cụ thể cung cấp
 cat > .env << EOF
 APP_NAME=FitnessApp
 APP_ENV=${APP_ENV:-production}
 APP_KEY=${APP_KEY:-}
-APP_DEBUG=${APP_DEBUG:-false}
+APP_DEBUG=true
 APP_URL=${RAILWAY_PUBLIC_DOMAIN:-${APP_URL:-http://localhost}}
 
-LOG_CHANNEL=${LOG_CHANNEL:-stack}
-LOG_LEVEL=${LOG_LEVEL:-error}
+LOG_CHANNEL=stderr
+LOG_LEVEL=debug
 
-# Cấu hình kết nối MySQL
+# Kết nối cơ sở dữ liệu MySQL
 DB_CONNECTION=mysql
-DB_HOST=${MYSQLHOST:-${DB_HOST:-127.0.0.1}}
-DB_PORT=${MYSQLPORT:-${DB_PORT:-3306}}
-DB_DATABASE=${MYSQLDATABASE:-${DB_DATABASE:-laravel}}
-DB_USERNAME=${MYSQLUSER:-${DB_USERNAME:-root}}
-DB_PASSWORD=${MYSQLPASSWORD:-${DB_PASSWORD:-}}
-DB_URL=${DATABASE_URL:-}
+DB_HOST=${DB_HOST:-trolley.proxy.rlwy.net}
+DB_PORT=${DB_PORT:-54154}
+DB_DATABASE=${DB_DATABASE:-railway}
+DB_USERNAME=${DB_USERNAME:-root}
+DB_PASSWORD=${DB_PASSWORD:-ARakarqbSOaCUkoUTXyGSYVMfEYVPuVY}
 
 BROADCAST_DRIVER=${BROADCAST_DRIVER:-log}
 CACHE_DRIVER=${CACHE_DRIVER:-file}
@@ -30,10 +82,10 @@ SESSION_DRIVER=${SESSION_DRIVER:-cookie}
 SESSION_LIFETIME=${SESSION_LIFETIME:-120}
 
 # Cấu hình CORS
-SANCTUM_STATEFUL_DOMAINS=${SANCTUM_STATEFUL_DOMAINS:-localhost:3000,127.0.0.1:3000,*.up.railway.app}
-SESSION_DOMAIN=${SESSION_DOMAIN:-.up.railway.app}
+SANCTUM_STATEFUL_DOMAINS=${SANCTUM_STATEFUL_DOMAINS:-localhost:3000,127.0.0.1:3000,*.railway.app}
+SESSION_DOMAIN=${SESSION_DOMAIN:-.railway.app}
 SESSION_SECURE_COOKIE=${SESSION_SECURE_COOKIE:-true}
-CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+CORS_ALLOWED_ORIGINS=${CORS_ORIGIN}
 EOF
 
 # Tạo application key nếu chưa có
@@ -42,106 +94,308 @@ if [ -z "$APP_KEY" ]; then
   php artisan key:generate --force
 fi
 
-# Hiển thị thông tin kết nối để debug
-echo "Thông tin kết nối MySQL:"
-echo "DB_HOST: ${MYSQLHOST:-${DB_HOST:-không có}}"
-echo "DB_PORT: ${MYSQLPORT:-${DB_PORT:-không có}}"
-echo "DB_DATABASE: ${MYSQLDATABASE:-${DB_DATABASE:-không có}}"
-echo "DB_USERNAME: ${MYSQLUSER:-${DB_USERNAME:-không có}}"
+# Xác định PORT
+PORT="${PORT:-8080}"
+echo "Port được cấu hình: $PORT"
 
-# Kiểm tra xem biến môi trường DATABASE_URL đã được đặt chưa
-if [ ! -z "$DATABASE_URL" ]; then
-  echo "Đã tìm thấy DATABASE_URL. Sẽ sử dụng để kết nối..."
+# Đảm bảo các thư mục framework tồn tại và có quyền ghi
+echo "Đảm bảo các thư mục framework tồn tại..."
+mkdir -p storage/framework/{sessions,views,cache}
+mkdir -p bootstrap/cache
+
+# Đặt quyền cho các thư mục quan trọng
+echo "Thiết lập quyền truy cập thư mục..."
+chmod -R 775 storage bootstrap/cache
+chown -R www-data:www-data storage bootstrap/cache
+
+# Kiểm tra và đảm bảo thư mục public tồn tại
+if [ ! -d "public" ]; then
+  echo "⚠️ Thư mục public không tồn tại, tạo mới thư mục public..."
+  mkdir -p public
 fi
 
-# Kiểm tra xem MySQL đã được cấu hình chưa
-if [ -z "${MYSQLHOST:-${DB_HOST}}" ]; then
-  echo "⚠️ Không tìm thấy thông tin máy chủ MySQL trong biến môi trường."
-  echo "⚠️ Đảm bảo bạn đã thêm MySQL addon trong Railway và biến môi trường đã được thiết lập."
-  echo "⚠️ Tiếp tục mà không có MySQL..."
+# Kiểm tra file index.php tồn tại trong thư mục public
+if [ ! -f "public/index.php" ]; then
+  echo "⚠️ File public/index.php không tồn tại!"
   
-  # Thiết lập SQLite làm dự phòng
-  echo "Sử dụng SQLite làm cơ sở dữ liệu dự phòng..."
-  sed -i "s/DB_CONNECTION=mysql/DB_CONNECTION=sqlite/" .env
-  touch database/database.sqlite
-  
-  # Tiếp tục mà không kiểm tra kết nối MySQL
+  # Tạo file index.php chuẩn cho Laravel trong thư mục public
+  cat > public/index.php << 'EOF_INDEX'
+<?php
+
+use Illuminate\Foundation\Application;
+use Illuminate\Http\Request;
+
+define('LARAVEL_START', microtime(true));
+
+// Determine if the application is in maintenance mode...
+if (file_exists($maintenance = __DIR__.'/../storage/framework/maintenance.php')) {
+    require $maintenance;
+}
+
+// Register the Composer autoloader...
+require __DIR__.'/../vendor/autoload.php';
+
+// Bootstrap Laravel and handle the request...
+/** @var Application $app */
+$app = require_once __DIR__.'/../bootstrap/app.php';
+
+$app->handleRequest(Request::capture());
+EOF_INDEX
+
+  echo "✅ Đã tạo file public/index.php"
 else
-  # Thử kết nối MySQL
-  echo "Đợi MySQL sẵn sàng..."
-  MAX_RETRIES=15
-  RETRY=0
-
-  # Function để kiểm tra kết nối MySQL
-  function check_mysql_connection() {
-    if nc -z -w5 "${MYSQLHOST:-${DB_HOST}}" "${MYSQLPORT:-${DB_PORT:-3306}}"; then
-      # Kết nối thành công, kiểm tra đăng nhập
-      if mysql -h"${MYSQLHOST:-${DB_HOST}}" -P"${MYSQLPORT:-${DB_PORT:-3306}}" -u"${MYSQLUSER:-${DB_USERNAME}}" -p"${MYSQLPASSWORD:-${DB_PASSWORD}}" -e "SELECT 1" >/dev/null 2>&1; then
-        return 0  # Có thể kết nối và đăng nhập thành công
-      fi
-    fi
-    return 1  # Không thể kết nối hoặc đăng nhập
-  }
-
-  # Thử kết nối nhiều lần
-  until check_mysql_connection || [ $RETRY -eq $MAX_RETRIES ]
-  do
-    echo "Thử kết nối MySQL lần $RETRY/$MAX_RETRIES..."
-    RETRY=$((RETRY+1))
-    sleep 2
-  done
-
-  if [ $RETRY -eq $MAX_RETRIES ]; then
-    echo "❌ Không thể kết nối đến MySQL sau $MAX_RETRIES lần thử!"
-    echo "⚠️ Chuyển sang sử dụng SQLite..."
-    
-    # Chuyển sang SQLite nếu kết nối MySQL thất bại
-    sed -i "s/DB_CONNECTION=mysql/DB_CONNECTION=sqlite/" .env
-    touch database/database.sqlite
-  else
-    echo "✅ Đã kết nối thành công đến MySQL!"
-    
-    # Tạo database nếu chưa tồn tại
-    echo "Kiểm tra và tạo database..."
-    DB_NAME="${MYSQLDATABASE:-${DB_DATABASE}}"
-    mysql -h"${MYSQLHOST:-${DB_HOST}}" -P"${MYSQLPORT:-${DB_PORT:-3306}}" -u"${MYSQLUSER:-${DB_USERNAME}}" -p"${MYSQLPASSWORD:-${DB_PASSWORD}}" -e "CREATE DATABASE IF NOT EXISTS \`$DB_NAME\`;" || true
-  fi
+  echo "✅ File public/index.php đã tồn tại."
 fi
+
+# Đảm bảo file test health tồn tại
+echo "OK" > public/health.txt
+echo "OK" > public/status.txt
+
+# Tạo file phpinfo.php để debug
+echo "<?php phpinfo(); ?>" > public/phpinfo.php
+
+# Cấu hình Nginx
+echo "Cấu hình Nginx với port $PORT..."
+
+# Đảm bảo thư mục cấu hình Nginx tồn tại
+mkdir -p /etc/nginx/conf.d
+
+# Tạo cấu hình Nginx mới với cấu trúc đúng
+cat > /etc/nginx/conf.d/default.conf << EOF
+server {
+    listen $PORT;
+    server_name _;
+    root /var/www/html/public;
+    index index.php;
+
+    location / {
+        try_files \$uri \$uri/ /index.php?\$query_string;
+        
+        # CORS headers
+        add_header 'Access-Control-Allow-Origin' '$CORS_ORIGIN' always;
+        add_header 'Access-Control-Allow-Methods' '$CORS_METHODS' always;
+        add_header 'Access-Control-Allow-Headers' '$CORS_HEADERS' always;
+        
+        # OPTIONS request handling
+        if (\$request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' '$CORS_ORIGIN';
+            add_header 'Access-Control-Allow-Methods' '$CORS_METHODS';
+            add_header 'Access-Control-Allow-Headers' '$CORS_HEADERS';
+            add_header 'Access-Control-Max-Age' '86400';
+            add_header 'Content-Type' 'text/plain charset=UTF-8';
+            add_header 'Content-Length' '0';
+            return 204;
+        }
+    }
+    
+    # PHP handler
+    location ~ \\.php$ {
+        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        include fastcgi_params;
+        
+        # CORS headers
+        add_header 'Access-Control-Allow-Origin' '$CORS_ORIGIN' always;
+        add_header 'Access-Control-Allow-Methods' '$CORS_METHODS' always;
+        add_header 'Access-Control-Allow-Headers' '$CORS_HEADERS' always;
+    }
+    
+    # Health check endpoints
+    location = /health.txt {
+        access_log off;
+        add_header Content-Type text/plain;
+        return 200 'OK';
+    }
+    
+    location = /status.txt {
+        access_log off;
+        add_header Content-Type text/plain;
+        return 200 'OK';
+    }
+}
+EOF
+
+echo "✅ Cấu hình Nginx đã được tạo"
+
+# Đảm bảo thư mục trong DocumentRoot tồn tại
+echo "Kiểm tra DocumentRoot /var/www/html/public..."
+if [ ! -d "/var/www/html/public" ]; then
+  echo "⚠️ Thư mục DocumentRoot không tồn tại, tạo mới..."
+  mkdir -p /var/www/html/public
+fi
+
+# Sao chép các tệp tin từ thư mục public của dự án vào /var/www/html/public
+echo "Sao chép các tệp tin từ thư mục public vào DocumentRoot..."
+if [ -d "public" ]; then
+  cp -r public/* /var/www/html/public/ 2>/dev/null || echo "❌ Không thể sao chép files"
+  
+  # Đặt quyền cho thư mục DocumentRoot
+  chown -R www-data:www-data /var/www/html
+  chmod -R 755 /var/www/html
+  echo "✅ Đã sao chép các tệp tin vào /var/www/html/public"
+else
+  echo "❌ Không tìm thấy thư mục public trong dự án!"
+fi
+
+# Tạo file index.php trong DocumentRoot nếu không tồn tại
+if [ ! -f "/var/www/html/public/index.php" ]; then
+  echo "⚠️ File index.php không tồn tại trong DocumentRoot, tạo mới..."
+  cat > /var/www/html/public/index.php << 'EOF_INDEX'
+<?php
+
+use Illuminate\Foundation\Application;
+use Illuminate\Http\Request;
+
+define('LARAVEL_START', microtime(true));
+
+// Determine if the application is in maintenance mode...
+if (file_exists($maintenance = __DIR__.'/../storage/framework/maintenance.php')) {
+    require $maintenance;
+}
+
+// Register the Composer autoloader...
+require __DIR__.'/../vendor/autoload.php';
+
+// Bootstrap Laravel and handle the request...
+/** @var Application $app */
+$app = require_once __DIR__.'/../bootstrap/app.php';
+
+$app->handleRequest(Request::capture());
+EOF_INDEX
+  echo "✅ Đã tạo file index.php trong DocumentRoot"
+fi
+
+# Tạo symbolic link từ thư mục gốc của Laravel đến /var/www/html
+echo "Tạo symbolic links từ thư mục Laravel đến /var/www/html..."
+for dir in app bootstrap config database resources routes storage vendor; do
+  if [ -d "$dir" ]; then
+    if [ ! -d "/var/www/html/$dir" ] || [ -L "/var/www/html/$dir" ]; then
+      rm -rf "/var/www/html/$dir" 2>/dev/null
+      ln -sf "$(pwd)/$dir" "/var/www/html/$dir"
+      echo "✅ Đã liên kết thư mục $dir"
+    else
+      echo "⚠️ Thư mục /var/www/html/$dir đã tồn tại và không phải symlink"
+    fi
+  else
+    echo "❌ Không tìm thấy thư mục $dir trong dự án"
+  fi
+done
+
+# Tạo file .env trong /var/www/html
+cp .env /var/www/html/.env 2>/dev/null
+
+# Cập nhật cấu hình Supervisor để chạy Nginx và PHP-FPM
+echo "Cập nhật cấu hình Supervisor..."
+cat > /etc/supervisor/conf.d/supervisord.conf << EOF
+[supervisord]
+nodaemon=true
+logfile=/var/log/supervisord.log
+pidfile=/var/run/supervisord.pid
+user=root
+
+[program:php-fpm]
+command=php-fpm
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
+
+[program:nginx]
+command=nginx -g "daemon off;"
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
+EOF
+
+echo "✅ Cấu hình Supervisor đã được cập nhật"
+
+# Xóa cache
+echo "Xóa cache Laravel..."
+php artisan cache:clear
+php artisan config:clear
+php artisan route:clear
 
 # Chạy migration
 echo "Chạy migration..."
-php artisan migrate --force || true
+php artisan migrate --force || echo "Lỗi khi chạy migration"
 
 # Tạo symbolic link cho storage
 echo "Tạo symbolic link..."
-php artisan storage:link || true
+php artisan storage:link || echo "Không thể tạo symbolic link"
 
 # Tối ưu ứng dụng
 echo "Tối ưu ứng dụng..."
-php artisan optimize
+php artisan optimize || echo "Không thể tối ưu ứng dụng"
 
-# Cấu hình CORS trong config file
-echo "Cấu hình CORS..."
-php -r "
-\$corsFile = 'config/cors.php';
-if (file_exists(\$corsFile)) {
-    \$content = file_get_contents(\$corsFile);
-    \$origins = '${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}';
-    \$originsArray = explode(',', \$origins);
-    \$formattedOrigins = array_map(function(\$origin) { return \"'\$origin'\"; }, \$originsArray);
-    \$originsString = implode(', ', \$formattedOrigins);
-    \$pattern = \"/'allowed_origins' => \\[(.*?)\\]/s\";
-    \$replacement = \"'allowed_origins' => [\$originsString]\";
-    \$content = preg_replace(\$pattern, \$replacement, \$content);
-    file_put_contents(\$corsFile, \$content);
-    echo 'CORS đã được cấu hình với các origins: ' . \$origins . PHP_EOL;
+# Tạo file kiểm tra kết nối để debug
+cat > /var/www/html/public/connection-test.php << 'EOF'
+<?php
+// Hiển thị tất cả lỗi
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+echo "<h1>Kiểm tra kết nối Laravel - MySQL</h1>";
+
+// Kiểm tra môi trường
+echo "<h2>Thông tin môi trường:</h2>";
+echo "<ul>";
+echo "<li>PHP version: " . phpversion() . "</li>";
+echo "<li>Server: " . $_SERVER['SERVER_SOFTWARE'] . "</li>";
+echo "<li>Document Root: " . $_SERVER['DOCUMENT_ROOT'] . "</li>";
+echo "<li>Current directory: " . getcwd() . "</li>";
+echo "</ul>";
+
+// Kiểm tra cấu trúc thư mục Laravel
+echo "<h2>Kiểm tra thư mục Laravel:</h2>";
+echo "<ul>";
+$dirs = ['app', 'bootstrap', 'config', 'database', 'resources', 'routes', 'storage', 'vendor'];
+foreach ($dirs as $dir) {
+    $path = dirname($_SERVER['DOCUMENT_ROOT']) . '/' . $dir;
+    echo "<li>$dir: " . (file_exists($path) ? "<span style='color:green'>Tồn tại</span>" : "<span style='color:red'>Không tồn tại</span>") . "</li>";
 }
-"
+echo "</ul>";
 
-# Thay đổi port trong Nginx
-PORT="${PORT:-8080}"
-echo "Cấu hình Nginx với port $PORT..."
-sed -i "s/listen 80/listen $PORT/g" /etc/nginx/sites-available/default
+// Thử kết nối MySQL
+try {
+    $db_host = getenv('DB_HOST') ?: 'trolley.proxy.rlwy.net';
+    $db_port = getenv('DB_PORT') ?: '54154';
+    $db_name = getenv('DB_DATABASE') ?: 'railway';
+    $db_user = getenv('DB_USERNAME') ?: 'root';
+    $db_pass = getenv('DB_PASSWORD') ?: 'ARakarqbSOaCUkoUTXyGSYVMfEYVPuVY';
 
-echo "🚀 Khởi động ứng dụng..."
+    echo "<h2>Thông tin kết nối MySQL:</h2>";
+    echo "<ul>";
+    echo "<li>Host: $db_host</li>";
+    echo "<li>Port: $db_port</li>";
+    echo "<li>Database: $db_name</li>";
+    echo "<li>Username: $db_user</li>";
+    echo "</ul>";
+
+    $pdo = new PDO("mysql:host=$db_host;port=$db_port;dbname=$db_name", $db_user, $db_pass);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    echo "<p style='color:green'>✅ Kết nối MySQL thành công!</p>";
+
+    // Thử truy vấn
+    $stmt = $pdo->query("SHOW TABLES");
+    $tables = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+    echo "<h2>Danh sách bảng:</h2>";
+    echo "<ul>";
+    if (count($tables) > 0) {
+        foreach ($tables as $table) {
+            echo "<li>$table</li>";
+        }
+    } else {
+        echo "<li>Không có bảng nào.</li>";
+    }
+    echo "</ul>";
+
+} catch (PDOException $e) {
+    echo "<p style='color:red'>❌ Lỗi kết nối MySQL: " . htmlspecialchars($e->getMessage()) . "</p>";
+}
+EOF
+
+echo "🚀 Khởi động ứng dụng với Nginx và PHP-FPM..."
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf

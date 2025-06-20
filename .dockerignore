@@ -31,3 +31,10 @@ yarn-error.log
 .env
 .phpunit.result.cache
 docker-compose.yml
+
+# Homestead
+Homestead.json
+Homestead.yaml
+
+# Vendor
+/vendor

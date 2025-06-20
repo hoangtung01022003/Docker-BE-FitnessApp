@@ -5,13 +5,19 @@
 
     RewriteEngine On
 
+    # Đảm bảo các file health check hoạt động
+    RewriteRule ^health\.txt$ - [L]
+    RewriteRule ^status\.txt$ - [L]
+    RewriteRule ^info\.php$ - [L]
+    RewriteRule ^test-db\.php$ - [L]
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
-    # Handle X-XSRF-Token Header
-    RewriteCond %{HTTP:x-xsrf-token} .
-    RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
+    # Xử lý OPTIONS method cho CORS pre-flight requests
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule ^(.*)$ $1 [R=200,L]
 
     # Redirect Trailing Slashes If Not A Folder...
     RewriteCond %{REQUEST_FILENAME} !-d
@@ -22,4 +28,37 @@
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
+</IfModule>
+
+# CORS Headers
+<IfModule mod_headers.c>
+    # Luôn gửi CORS headers với mọi response
+    Header always set Access-Control-Allow-Origin "*"
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, X-CSRF-TOKEN, X-Requested-With, Accept, Origin"
+    Header always set Access-Control-Max-Age "1728000"
+    Header always set Access-Control-Expose-Headers "Content-Length, Content-Range"
+    
+    # Xử lý riêng cho OPTIONS request
+    <If "%{REQUEST_METHOD} == 'OPTIONS'">
+        Header always set Access-Control-Allow-Origin "*"
+        Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, X-CSRF-TOKEN, X-Requested-With, Accept, Origin"
+        Header always set Access-Control-Max-Age "1728000"
+        Header always set HTTP/1.1 200 OK
+        Header always set Content-Length 0
+        Header always set Content-Type text/plain
+    </If>
+</IfModule>
+
+# Đảm bảo PHP được xử lý
+<FilesMatch "\.php$">
+    SetHandler application/x-httpd-php
+</FilesMatch>
+
+# Bảo mật
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set X-Frame-Options "SAMEORIGIN"
 </IfModule>
