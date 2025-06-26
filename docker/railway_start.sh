@@ -13,23 +13,10 @@ if [ -f "/etc/apache2/sites-available/000-default.conf" ]; then
   echo "✅ Apache đã được vô hiệu hóa"
 fi
 
-# Trích xuất các giá trị CORS từ biến môi trường
+# Thiết lập CORS đơn giản và an toàn nhất
 CORS_ORIGIN="*"
-CORS_METHODS="GET,POST,PUT,DELETE,OPTIONS"
-CORS_HEADERS="Content-Type,Authorization,X-Requested-With"
-
-if [ ! -z "${CORS_ALLOW_ORIGIN}" ]; then
-  CORS_PARTS=(${CORS_ALLOW_ORIGIN})
-  CORS_ORIGIN=${CORS_PARTS[0]}
-  
-  for part in "${CORS_PARTS[@]}"; do
-    if [[ $part == CORS_ALLOW_METHODS=* ]]; then
-      CORS_METHODS=${part#CORS_ALLOW_METHODS=}
-    elif [[ $part == CORS_ALLOW_HEADERS=* ]]; then
-      CORS_HEADERS=${part#CORS_ALLOW_HEADERS=}
-    fi
-  done
-fi
+CORS_METHODS="GET, POST, PUT, DELETE, OPTIONS"
+CORS_HEADERS="Content-Type, Authorization, X-Requested-With, Accept"
 
 echo "CORS Origin: $CORS_ORIGIN"
 echo "CORS Methods: $CORS_METHODS"
@@ -85,7 +72,7 @@ SESSION_LIFETIME=${SESSION_LIFETIME:-120}
 SANCTUM_STATEFUL_DOMAINS=${SANCTUM_STATEFUL_DOMAINS:-localhost:3000,127.0.0.1:3000,*.railway.app}
 SESSION_DOMAIN=${SESSION_DOMAIN:-.railway.app}
 SESSION_SECURE_COOKIE=${SESSION_SECURE_COOKIE:-true}
-CORS_ALLOWED_ORIGINS=${CORS_ORIGIN}
+CORS_ALLOWED_ORIGINS=*
 EOF
 
 # Tạo application key nếu chưa có
@@ -160,7 +147,7 @@ echo "Cấu hình Nginx với port $PORT..."
 # Đảm bảo thư mục cấu hình Nginx tồn tại
 mkdir -p /etc/nginx/conf.d
 
-# Tạo cấu hình Nginx mới với cấu trúc đúng
+# Tạo cấu hình Nginx mới với xử lý CORS được cải thiện
 cat > /etc/nginx/conf.d/default.conf << EOF
 server {
     listen $PORT;
@@ -170,34 +157,23 @@ server {
 
     location / {
         try_files \$uri \$uri/ /index.php?\$query_string;
-        
-        # CORS headers
-        add_header 'Access-Control-Allow-Origin' '$CORS_ORIGIN' always;
-        add_header 'Access-Control-Allow-Methods' '$CORS_METHODS' always;
-        add_header 'Access-Control-Allow-Headers' '$CORS_HEADERS' always;
-        
-        # OPTIONS request handling
-        if (\$request_method = 'OPTIONS') {
-            add_header 'Access-Control-Allow-Origin' '$CORS_ORIGIN';
-            add_header 'Access-Control-Allow-Methods' '$CORS_METHODS';
-            add_header 'Access-Control-Allow-Headers' '$CORS_HEADERS';
-            add_header 'Access-Control-Max-Age' '86400';
-            add_header 'Content-Type' 'text/plain charset=UTF-8';
-            add_header 'Content-Length' '0';
-            return 204;
-        }
     }
     
-    # PHP handler
-    location ~ \\.php$ {
+    # # Xử lý pre-flight OPTIONS request ở cấp độ server
+    # if (\$request_method = OPTIONS) {
+    #     add_header 'Access-Control-Allow-Origin' '*';
+    #     add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS';
+    #     add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, X-Requested-With, Accept';
+    #     add_header 'Access-Control-Max-Age' '86400';
+    #     add_header 'Content-Type' 'text/plain charset=UTF-8';
+    #     add_header 'Content-Length' '0';
+    #     return 204;
+    # }
+    
+    location ~ \.php$ {
         fastcgi_pass 127.0.0.1:9000;
         fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
         include fastcgi_params;
-        
-        # CORS headers
-        add_header 'Access-Control-Allow-Origin' '$CORS_ORIGIN' always;
-        add_header 'Access-Control-Allow-Methods' '$CORS_METHODS' always;
-        add_header 'Access-Control-Allow-Headers' '$CORS_HEADERS' always;
     }
     
     # Health check endpoints

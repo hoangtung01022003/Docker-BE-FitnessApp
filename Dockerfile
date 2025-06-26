@@ -86,9 +86,7 @@ RUN echo '<?php\n\
 ini_set("display_errors", 1);\n\
 ini_set("display_startup_errors", 1);\n\
 error_reporting(E_ALL);\n\
-
 echo "<h1>Kiểm tra kết nối Laravel - MySQL</h1>";\n\
-
 // Kiểm tra môi trường\n\
 echo "<h2>Thông tin môi trường:</h2>";\n\
 echo "<ul>";\n\
@@ -97,7 +95,6 @@ echo "<li>Server: " . $_SERVER["SERVER_SOFTWARE"] . "</li>";\n\
 echo "<li>Document Root: " . $_SERVER["DOCUMENT_ROOT"] . "</li>";\n\
 echo "<li>Current directory: " . getcwd() . "</li>";\n\
 echo "</ul>";\n\
-
 # // Thử kết nối MySQL
 try {\n\
     $db_host = getenv("DB_HOST") ?: "trolley.proxy.rlwy.net";\n\
@@ -105,7 +102,6 @@ try {\n\
     $db_name = getenv("DB_DATABASE") ?: "railway";\n\
     $db_user = getenv("DB_USERNAME") ?: "root";\n\
     $db_pass = getenv("DB_PASSWORD") ?: "ARakarqbSOaCUkoUTXyGSYVMfEYVPuVY";\n\
-
     echo "<h2>Thông tin kết nối MySQL:</h2>";\n\
     echo "<ul>";\n\
     echo "<li>Host: $db_host</li>";\n\
@@ -113,15 +109,12 @@ try {\n\
     echo "<li>Database: $db_name</li>";\n\
     echo "<li>Username: $db_user</li>";\n\
     echo "</ul>";\n\
-
     $pdo = new PDO("mysql:host=$db_host;port=$db_port;dbname=$db_name", $db_user, $db_pass);\n\
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);\n\
     echo "<p style=\"color:green\">✅ Kết nối MySQL thành công!</p>";\n\
-
     // Thử truy vấn\n\
     $stmt = $pdo->query("SHOW TABLES");\n\
     $tables = $stmt->fetchAll(PDO::FETCH_COLUMN);\n\
-
     echo "<h2>Danh sách bảng:</h2>";\n\
     echo "<ul>";\n\
     if (count($tables) > 0) {\n\
@@ -132,7 +125,6 @@ try {\n\
         echo "<li>Không có bảng nào.</li>";\n\
     }\n\
     echo "</ul>";\n\
-
 } catch (PDOException $e) {\n\
     echo "<p style=\"color:red\">❌ Lỗi kết nối MySQL: " . htmlspecialchars($e->getMessage()) . "</p>";\n\
 }\n\

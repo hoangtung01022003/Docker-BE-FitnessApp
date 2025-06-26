@@ -13,24 +13,47 @@ class ProfileController extends Controller
     public function saveProfile(Request $request)
     {
         try {
+            // Log request data để kiểm tra
+            \Log::info('Profile data received:', $request->all());
+
             $validated = $request->validate([
                 'birthday' => 'nullable|date',
                 'height' => 'nullable|numeric|min:0|max:300',
                 'weight' => 'nullable|numeric|min:0|max:500',
                 'gender' => 'nullable|in:Male,Female',
+                'fitness_level' => 'nullable|in:Beginner,Intermediate,Advanced',
             ]);
+
+            if ($request->has('fitness_level')) {
+                $validated['fitness_level'] = $request->input('fitness_level');
+            }
+
+            \Log::info('Validated data:', $validated);
+            // Log validated data
+            \Log::info('Validated profile data:', $validated);
 
             // Tìm hoặc tạo mới profile cho user
             $profile = UserProfile::updateOrCreate(
-                ['user_id' => auth()->id()], // điều kiện tìm kiếm
-                $validated // dữ liệu cập nhật
+                ['user_id' => auth()->id()],
+                $validated
             );
+
+            // Kiểm tra và cập nhật trực tiếp fitness_level nếu có
+            if ($request->has('fitness_level')) {
+                $profile->fitness_level = $request->input('fitness_level');
+                $profile->save();
+            }
+
+            // Log profile data sau khi lưu
+            \Log::info('Profile after save:', $profile->toArray());
 
             return response()->json([
                 'message' => 'Profile saved successfully',
                 'profile' => $profile
             ]);
         } catch (\Exception $e) {
+            \Log::error('Error saving profile:', ['message' => $e->getMessage()]);
+
             return response()->json([
                 'message' => 'Failed to save profile',
                 'error' => $e->getMessage()
@@ -46,7 +69,7 @@ class ProfileController extends Controller
         try {
             $user = auth()->user();
             $profile = $user->profile;
-            
+
             if (!$profile) {
                 return response()->json([
                     'message' => 'Profile not found',

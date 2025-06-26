@@ -1,2 +1,5 @@
+[phases.setup]
+nixPkgs = ["..."] # (nếu có)
+
 [start]
-cmd = "php -S 0.0.0.0:$PORT -t public"
+cmd = "php artisan migrate --force && php -S 0.0.0.0:$PORT -t public"

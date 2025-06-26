@@ -11,13 +11,12 @@ return [
     |
     */
 
-    // Nếu đang chạy trên Railway, vô hiệu hóa các đường dẫn xử lý CORS
-    'paths' => env('RAILWAY_ENVIRONMENT') ? [] : ['api/*', 'sanctum/csrf-cookie', '*'],
+    // Kích hoạt xử lý CORS trong Laravel để có cách xử lý nhất quán
+    'paths' => ['api/*', 'sanctum/csrf-cookie'],
 
     'allowed_methods' => ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 
-    // Chỉ nên có một nguồn '*' hoặc một danh sách cụ thể
-    'allowed_origins' => [env('CORS_ALLOW_ORIGIN', '*')],
+    'allowed_origins' => ['*'],
 
     'allowed_origins_patterns' => [],
 

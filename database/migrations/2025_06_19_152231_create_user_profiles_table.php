@@ -18,6 +18,7 @@ return new class extends Migration
             $table->decimal('height', 5, 2)->nullable();
             $table->decimal('weight', 5, 2)->nullable();
             $table->enum('gender', ['Male', 'Female'])->nullable();
+            $table->enum('fitness_level', ['Beginner', 'Intermediate', 'Advanced'])->nullable()->comment('User fitness level');
             $table->timestamps();
         });
     }

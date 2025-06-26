@@ -14,7 +14,8 @@ class UserProfile extends Model
         'birthday',
         'height',
         'weight',
-        'gender'
+        'gender',
+        'fitness_level'
     ];
 
     protected $casts = [
