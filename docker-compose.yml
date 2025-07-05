@@ -42,8 +42,10 @@ services:
             - '3306:3306'
         volumes:
             - 'fitness-mysql-data:/var/lib/mysql'
+            - './docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf'
         networks:
             - fitness-network
+        command: --max_allowed_packet=32505856 --wait_timeout=3600 --interactive_timeout=3600
     redis:
         image: 'redis:alpine'
         container_name: fitness-redis

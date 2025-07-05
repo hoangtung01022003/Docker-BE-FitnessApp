@@ -9,6 +9,7 @@ docker-volumes/
 # Node modules and assets
 /node_modules
 /public/hot
+/public/storage
 
 # Persistent storage
 /storage/app/*

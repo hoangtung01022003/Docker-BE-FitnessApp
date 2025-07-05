@@ -14,8 +14,6 @@ class ProfileController extends Controller
     {
         try {
             // Log request data để kiểm tra
-            \Log::info('Profile data received:', $request->all());
-
             $validated = $request->validate([
                 'birthday' => 'nullable|date',
                 'height' => 'nullable|numeric|min:0|max:300',
@@ -27,10 +25,6 @@ class ProfileController extends Controller
             if ($request->has('fitness_level')) {
                 $validated['fitness_level'] = $request->input('fitness_level');
             }
-
-            \Log::info('Validated data:', $validated);
-            // Log validated data
-            \Log::info('Validated profile data:', $validated);
 
             // Tìm hoặc tạo mới profile cho user
             $profile = UserProfile::updateOrCreate(
@@ -45,14 +39,12 @@ class ProfileController extends Controller
             }
 
             // Log profile data sau khi lưu
-            \Log::info('Profile after save:', $profile->toArray());
 
             return response()->json([
                 'message' => 'Profile saved successfully',
                 'profile' => $profile
             ]);
         } catch (\Exception $e) {
-            \Log::error('Error saving profile:', ['message' => $e->getMessage()]);
 
             return response()->json([
                 'message' => 'Failed to save profile',

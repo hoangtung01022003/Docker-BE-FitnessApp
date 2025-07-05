@@ -15,15 +15,13 @@ class Kernel extends HttpKernel
     protected $middleware = [
         // \App\Http\Middleware\TrustHosts::class,
         \App\Http\Middleware\TrustProxies::class,
-        \Illuminate\Http\Middleware\HandleCors::class, // Sử dụng middleware CORS tích hợp của Laravel
-        \App\Http\Middleware\FixDuplicateCorsHeaders::class, // Thêm middleware mới
+        \Illuminate\Http\Middleware\HandleCors::class, // Laravel's built-in CORS middleware
+        \App\Http\Middleware\CorsMiddleware::class, // Our custom CORS middleware for local Docker
         \App\Http\Middleware\PreventRequestsDuringMaintenance::class,
         \Illuminate\Foundation\Http\Middleware\ValidatePostSize::class,
         \App\Http\Middleware\TrimStrings::class,
         \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
-        \App\Http\Middleware\StripDuplicateCorsHeaders::class, // Thêm middleware mới này vào CUỐI danh sách
-        // Thêm vào đầu danh sách để xử lý trước các middleware khác
-        \App\Http\Middleware\CorsMiddleware::class,
+        // Removed Railway-specific CORS middleware
     ];
 
     /**
